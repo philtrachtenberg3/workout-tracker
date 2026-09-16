@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Repper
 
-## Getting Started
+A voice-first workout tracker. Talk through your workout out loud, tap to stop, and it's transcribed and logged automatically. Ask natural-language questions about your training history ("what did I do last week?", "how much have I benched the past 5 times?").
 
-First, run the development server:
+## How it works
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. **Record** — tap the mic, talk through your workout for as long as you want, tap again to stop.
+2. **Transcribe** — your recording is sent to OpenAI's `gpt-4o-transcribe` for high-accuracy transcription.
+3. **Parse** — the transcript is sent to Claude, which extracts structured exercises/sets/reps/weight.
+4. **Review** — you get an editable summary to fix anything before saving.
+5. **Ask** — ask questions about your history; Claude looks up your actual logged data (via a couple of read-only tools) before answering.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Everything is stored locally in a SQLite database (`prisma/dev.db`).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Install dependencies (requires **Node 20+** — this repo pins it via `.nvmrc`):
+   ```bash
+   nvm use
+   npm install
+   ```
+2. Copy the env template and add your own API keys:
+   ```bash
+   cp .env.local.example .env
+   ```
+   Then edit `.env` and set:
+   - `OPENAI_API_KEY` — from [platform.openai.com](https://platform.openai.com/api-keys). Used for transcription (`gpt-4o-transcribe`); billed per minute of audio (~$0.006/min).
+   - `ANTHROPIC_API_KEY` — from [console.anthropic.com](https://console.anthropic.com/settings/keys). Used to parse transcripts into structured workouts and to answer questions about your history.
 
-## Learn More
+   (A `.env` with placeholder keys already exists from initial setup — just replace the placeholder values.)
+3. The database is already created and migrated. If you ever reset it or change `prisma/schema.prisma`, run:
+   ```bash
+   npx prisma migrate dev
+   ```
+4. Run the app:
+   ```bash
+   npm run dev
+   ```
+   Open [http://localhost:3000](http://localhost:3000). Recording requires microphone permission in the browser.
 
-To learn more about Next.js, take a look at the following resources:
+## Notes
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- This is set up for **local use only** — no auth, no hosting. Your data lives in `prisma/dev.db` on your machine.
+- The record → review flow always shows you the parsed sets before saving, so you can fix any misheard numbers.
+- `/ask` only ever reads your logged data through two fixed lookup tools (by date range, or by exercise name) — it can't invent numbers or run arbitrary queries.
