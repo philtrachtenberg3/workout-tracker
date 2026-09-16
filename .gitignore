@@ -47,3 +47,6 @@ next-env.d.ts
 
 # Claude Code session runtime state (machine/session-specific, not project config)
 /.claude/
+
+# SpecStory editor extension's local chat transcript logs
+/.specstory/
