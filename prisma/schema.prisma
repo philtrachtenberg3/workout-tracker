@@ -24,6 +24,11 @@ model Exercise {
   workoutId  String
   name       String
   order      Int
+  // "sets": one or more discrete sets, each tracked individually.
+  // "total": a single reported aggregate (e.g. "100 push-ups", "shot
+  // baskets for 15 minutes") with no implied set breakdown — always
+  // exactly one SetEntry.
+  structure  String     @default("sets")
   sets       SetEntry[]
 
   @@index([workoutId])

@@ -6,8 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { DurationField } from "@/components/duration-field";
 import { Plus, Trash2 } from "lucide-react";
-import type { EditableExercise, EditableSet, ParsedWorkout, WeightUnit } from "@/lib/types";
+import type { EditableExercise, EditableSet, ExerciseStructure, ParsedWorkout, WeightUnit } from "@/lib/types";
 import { emptyExercise, emptySet } from "@/lib/workout-editing";
+import { cn } from "@/lib/utils";
 
 interface Props {
   value: ParsedWorkout;
@@ -19,6 +20,20 @@ export function WorkoutReviewForm({ value, onChange }: Props) {
     onChange({
       ...value,
       exercises: value.exercises.map((ex, idx) => (idx === i ? { ...ex, ...patch } : ex)),
+    });
+  }
+
+  function setStructure(exIdx: number, structure: ExerciseStructure) {
+    onChange({
+      ...value,
+      exercises: value.exercises.map((ex, idx) => {
+        if (idx !== exIdx) return ex;
+        if (structure === "total") {
+          // A total is one aggregate entry — collapse down to the first set.
+          return { ...ex, structure, sets: ex.sets.length ? ex.sets.slice(0, 1) : [emptySet()] };
+        }
+        return { ...ex, structure };
+      }),
     });
   }
 
@@ -76,39 +91,59 @@ export function WorkoutReviewForm({ value, onChange }: Props) {
         const showDuration = ex.sets.some((s) => s.durationSeconds != null);
         const showDistance = ex.sets.some((s) => s.distance != null);
         const showRpe = ex.sets.some((s) => s.rpe != null);
+        const isTotal = ex.structure === "total";
 
         return (
           <Card key={exIdx}>
-            <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
-              <Input
-                value={ex.name}
-                onChange={(e) => updateExercise(exIdx, { name: e.target.value })}
-                placeholder="Exercise name"
-                className="text-base font-semibold"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => removeExercise(exIdx)}
-                aria-label="Remove exercise"
-              >
-                <Trash2 className="size-4" />
-              </Button>
+            <CardHeader className="gap-2 space-y-0 pb-2">
+              <div className="flex items-center gap-2">
+                <Input
+                  value={ex.name}
+                  onChange={(e) => updateExercise(exIdx, { name: e.target.value })}
+                  placeholder="Exercise name"
+                  className="text-base font-semibold"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => removeExercise(exIdx)}
+                  aria-label="Remove exercise"
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+              <div className="flex overflow-hidden rounded-md border border-input w-fit">
+                {(["sets", "total"] as const).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setStructure(exIdx, s)}
+                    className={cn(
+                      "px-2.5 py-1 text-xs font-medium capitalize transition-colors",
+                      ex.structure === s
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted",
+                    )}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             </CardHeader>
             <CardContent className="space-y-1.5">
               <div className="flex items-center gap-1.5 px-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                <span className="w-5 shrink-0">#</span>
-                <span className="flex-1">Reps</span>
+                {!isTotal && <span className="w-5 shrink-0">#</span>}
+                <span className="flex-1">{isTotal ? "Reps total" : "Reps"}</span>
                 <span className="flex-[1.4]">Weight</span>
                 {showDuration && <span className="flex-1">Time</span>}
                 {showDistance && <span className="flex-1">Dist</span>}
                 {showRpe && <span className="flex-1">RPE</span>}
-                <span className="w-7 shrink-0" />
+                {!isTotal && <span className="w-7 shrink-0" />}
               </div>
               {ex.sets.map((set, setIdx) => (
                 <div key={setIdx} className="flex items-center gap-1.5">
-                  <span className="w-5 shrink-0 text-xs text-muted-foreground">{setIdx + 1}</span>
+                  {!isTotal && <span className="w-5 shrink-0 text-xs text-muted-foreground">{setIdx + 1}</span>}
                   <Input
                     type="number"
                     inputMode="numeric"
@@ -174,21 +209,25 @@ export function WorkoutReviewForm({ value, onChange }: Props) {
                       }
                     />
                   )}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => removeSet(exIdx, setIdx)}
-                    aria-label="Remove set"
-                    className="shrink-0"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
+                  {!isTotal && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => removeSet(exIdx, setIdx)}
+                      aria-label="Remove set"
+                      className="shrink-0"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  )}
                 </div>
               ))}
-              <Button type="button" variant="outline" size="sm" onClick={() => addSet(exIdx)} className="mt-1.5">
-                <Plus className="size-3.5" /> Add set
-              </Button>
+              {!isTotal && (
+                <Button type="button" variant="outline" size="sm" onClick={() => addSet(exIdx)} className="mt-1.5">
+                  <Plus className="size-3.5" /> Add set
+                </Button>
+              )}
             </CardContent>
           </Card>
         );

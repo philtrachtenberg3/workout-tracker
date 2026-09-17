@@ -36,6 +36,50 @@ export function formatSet(set: FormatableSet): string {
   return parts.join(", ") || "—";
 }
 
+export interface FormatableExercise {
+  structure: string; // "sets" | "total"
+  sets: FormatableSet[];
+}
+
+function setsEqual(a: FormatableSet, b: FormatableSet): boolean {
+  return (
+    a.reps === b.reps &&
+    a.weight === b.weight &&
+    a.weightUnit === b.weightUnit &&
+    a.durationSeconds === b.durationSeconds &&
+    a.distance === b.distance &&
+    a.distanceUnit === b.distanceUnit &&
+    a.rpe === b.rpe &&
+    a.notes === b.notes
+  );
+}
+
+// Summary lines used in list views, one per line — respects "total"
+// exercises so they never get mislabeled as "1 set" (which implies one
+// continuous unbroken set), and groups consecutive identical sets so a
+// pyramid/drop set doesn't get flattened into "N sets" of just the first
+// set's numbers. The exercise name is shown once by the caller; each
+// returned line covers one group of identical sets.
+export function formatExerciseLines(ex: FormatableExercise): string[] {
+  if (ex.structure === "total") {
+    const first = ex.sets[0];
+    return first ? [formatSet(first)] : ["—"];
+  }
+  if (ex.sets.length === 0) return ["—"];
+
+  const groups: { count: number; set: FormatableSet }[] = [];
+  for (const set of ex.sets) {
+    const last = groups[groups.length - 1];
+    if (last && setsEqual(last.set, set)) {
+      last.count += 1;
+    } else {
+      groups.push({ count: 1, set });
+    }
+  }
+
+  return groups.map((g) => `${g.count} set${g.count === 1 ? "" : "s"} · ${formatSet(g.set)}`);
+}
+
 export function formatDate(date: Date | string): string {
   // A bare "YYYY-MM-DD" string parses as UTC midnight via `new Date(...)`,
   // which can display as the previous day west of UTC — go through the

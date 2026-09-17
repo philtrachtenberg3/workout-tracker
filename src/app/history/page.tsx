@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatDate, formatSet } from "@/lib/format";
+import { formatDate, formatExerciseLines } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -37,12 +37,13 @@ export default async function HistoryPage() {
             </CardHeader>
             <CardContent className="space-y-1 text-sm">
               {w.exercises.map((ex) => (
-                <div key={ex.id} className="flex justify-between gap-2">
+                <div key={ex.id} className="flex items-start justify-between gap-2">
                   <span className="font-medium">{ex.name}</span>
-                  <span className="truncate text-right text-muted-foreground">
-                    {ex.sets.length} set{ex.sets.length === 1 ? "" : "s"}
-                    {ex.sets[0] ? ` · ${formatSet(ex.sets[0])}` : ""}
-                  </span>
+                  <div className="flex flex-col items-end text-right text-muted-foreground">
+                    {formatExerciseLines(ex).map((line, i) => (
+                      <span key={i}>{line}</span>
+                    ))}
+                  </div>
                 </div>
               ))}
             </CardContent>

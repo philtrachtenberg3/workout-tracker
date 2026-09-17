@@ -1,5 +1,5 @@
 import type { Exercise, SetEntry, Workout } from "@prisma/client";
-import type { EditableExercise, EditableSet, ParsedWorkout, WeightUnit } from "@/lib/types";
+import type { EditableExercise, EditableSet, ExerciseStructure, ParsedWorkout, WeightUnit } from "@/lib/types";
 import { toDateOnlyString, todayDateOnlyString } from "@/lib/date-utils";
 
 export function emptySet(): EditableSet {
@@ -16,7 +16,7 @@ export function emptySet(): EditableSet {
 }
 
 export function emptyExercise(): EditableExercise {
-  return { name: "", sets: [emptySet()] };
+  return { name: "", structure: "sets", sets: [emptySet()] };
 }
 
 export function emptyWorkout(): ParsedWorkout {
@@ -31,6 +31,7 @@ export function dbWorkoutToEditable(workout: DbWorkout): ParsedWorkout {
     notes: workout.notes,
     exercises: workout.exercises.map((ex) => ({
       name: ex.name,
+      structure: (ex.structure === "total" ? "total" : "sets") as ExerciseStructure,
       sets: ex.sets.map((s) => ({
         reps: s.reps,
         weight: s.weight,

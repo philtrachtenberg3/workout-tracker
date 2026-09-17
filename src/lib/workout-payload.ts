@@ -13,6 +13,7 @@ export const setPayloadSchema = z.object({
 
 export const exercisePayloadSchema = z.object({
   name: z.string().min(1),
+  structure: z.enum(["sets", "total"]).default("sets"),
   sets: z.array(setPayloadSchema),
 });
 
@@ -34,6 +35,7 @@ export function toPrismaExercisesCreate(exercises: WorkoutPayload["exercises"]) 
   return exercises.map((ex, i) => ({
     name: ex.name,
     order: i,
+    structure: ex.structure,
     sets: {
       create: ex.sets.map((s, j) => ({
         order: j,

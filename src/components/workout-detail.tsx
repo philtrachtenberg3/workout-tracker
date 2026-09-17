@@ -101,7 +101,7 @@ export function WorkoutDetail({ id, rawTranscript, initialWorkout }: Props) {
               <CardContent className="space-y-1 text-sm">
                 {ex.sets.map((s, j) => (
                   <div key={j} className="flex gap-2">
-                    <span className="w-5 text-muted-foreground">{j + 1}</span>
+                    {ex.structure === "sets" && <span className="w-5 text-muted-foreground">{j + 1}</span>}
                     <span>{formatSet(s)}</span>
                   </div>
                 ))}

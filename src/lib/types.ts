@@ -1,5 +1,10 @@
 export type WeightUnit = "lb" | "kg";
 
+// "sets": one or more discrete sets, each tracked individually.
+// "total": a single reported aggregate ("100 push-ups", "ran for 20 min")
+// with no implied set breakdown — always exactly one EditableSet.
+export type ExerciseStructure = "sets" | "total";
+
 export interface EditableSet {
   reps: number | null;
   weight: number | null;
@@ -13,6 +18,7 @@ export interface EditableSet {
 
 export interface EditableExercise {
   name: string;
+  structure: ExerciseStructure;
   sets: EditableSet[];
 }
 

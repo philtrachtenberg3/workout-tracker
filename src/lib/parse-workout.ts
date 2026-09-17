@@ -26,10 +26,16 @@ const LOG_WORKOUT_TOOL: Anthropic.Tool = {
               description:
                 "Normalized exercise name, e.g. 'Bench Press', 'Back Squat', 'Pull-Up'. Fix obvious mis-transcriptions using gym context.",
             },
+            structure: {
+              type: "string",
+              enum: ["sets", "total"],
+              description:
+                "'sets' when the user describes one or more discrete sets (explicit set/round counting language, 'x' notation like '5x5', or multiple distinct performances of the exercise). 'total' when the user gives a single aggregate number or duration for the whole exercise with no set breakdown (a class, a duration of cardio, or a rep count reported as a session total, e.g. '100 push-ups', 'body pump for an hour', 'shot baskets for 15 minutes'). When 'total', the sets array must contain exactly one entry — do not invent a set breakdown that wasn't said.",
+            },
             sets: {
               type: "array",
               description:
-                "Each individual set performed for this exercise, in order. If the user gives a shorthand like '3 sets of 10 at 135', expand it into 3 separate set objects. Omit fields that don't apply rather than guessing.",
+                "Each individual set performed for this exercise, in order. If the user gives a shorthand like '3 sets of 10 at 135', expand it into 3 separate set objects. For a 'total'-structure exercise, this is exactly one entry holding the aggregate value(s). Omit fields that don't apply rather than guessing.",
               items: {
                 type: "object",
                 properties: {
@@ -46,7 +52,7 @@ const LOG_WORKOUT_TOOL: Anthropic.Tool = {
               },
             },
           },
-          required: ["name", "sets"],
+          required: ["name", "structure", "sets"],
         },
       },
       notes: {
@@ -67,7 +73,11 @@ function buildSystemPrompt(): string {
 Today's date is ${today} (a ${weekday}).
 
 Rules:
-- Expand shorthand like "3 sets of 10 at 135" into 3 individual set entries.
+- Expand shorthand like "3 sets of 10 at 135" into 3 individual set entries (structure "sets").
+- Decide each exercise's structure carefully:
+  - "sets" when the user uses explicit set/round counting language ("3 sets of...", "5x5", "3 rounds of..."), or narrates multiple distinct performances of the exercise even without the word "sets" (e.g. "135 for 10, then 145 for 8"), or explicitly says it was one set ("just one set today, 20 pull-ups").
+  - "total" when the user gives one cumulative number or duration for the whole exercise with no set-counting language — classes, cardio/sport sessions, or a rep count reported as a session total (e.g. "100 push-ups", "100 sit-ups", "body pump class for an hour", "shot baskets for 15 minutes", "planked for 5 minutes", "ran 2 miles"). This is the default when a single number is given with no set language, since it usually represents effort accumulated across multiple unstated sets, not one unbroken set.
+  - A "total" exercise's sets array always has exactly one entry — never split a total into an invented set breakdown.
 - If the user corrects themselves, use the corrected value only — this applies to any field, including weight unit (e.g. "135 pounds... wait I mean kilograms" -> kg for the whole exercise, not just that mention).
 - If reps/weight change across sets (e.g. a pyramid or drop set), record each set's actual values, not an average.
 - Warm-up sets the user explicitly calls out as warm-ups should still be included as sets, in order, before the working sets.
@@ -98,6 +108,7 @@ export async function parseWorkoutTranscript(transcript: string): Promise<Parsed
     date?: string | null;
     exercises: Array<{
       name: string;
+      structure?: string;
       sets: Array<Record<string, unknown>>;
     }>;
     notes?: string | null;
@@ -111,7 +122,8 @@ export async function parseWorkoutTranscript(transcript: string): Promise<Parsed
     notes: raw.notes ?? null,
     exercises: raw.exercises.map((ex) => ({
       name: ex.name,
-      sets: ex.sets.map((s) => ({
+      structure: ex.structure === "total" ? "total" : "sets",
+      sets: (ex.structure === "total" ? ex.sets.slice(0, 1) : ex.sets).map((s) => ({
         reps: (s.reps as number | null) ?? null,
         weight: (s.weight as number | null) ?? null,
         weightUnit: (s.weightUnit as "lb" | "kg" | undefined) ?? "lb",

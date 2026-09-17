@@ -50,6 +50,7 @@ async function getWorkoutsInRange(start: string, end: string) {
     notes: w.notes,
     exercises: w.exercises.map((ex) => ({
       name: ex.name,
+      structure: ex.structure, // "total" = reported as one aggregate, not discrete sets
       sets: ex.sets.map(formatSet),
     })),
   }));
@@ -66,6 +67,7 @@ async function getExerciseHistory(exerciseName: string, limit = 10) {
   return exercises.map((ex) => ({
     date: toDateOnlyString(ex.workout.date),
     exercise: ex.name,
+    structure: ex.structure,
     sets: ex.sets.map(formatSet),
   }));
 }
@@ -89,7 +91,7 @@ export async function answerWorkoutQuery(question: string): Promise<string> {
   const today = todayDateOnlyString();
   const messages: Anthropic.MessageParam[] = [{ role: "user", content: question }];
 
-  const system = `You are a helpful workout tracking assistant. Today's date is ${today}. Always use the provided tools to look up the user's actual logged data before answering — never guess or estimate numbers. If a query implies a date range (e.g. "last week", "this month"), compute the actual dates yourself relative to today. Weights are already in the unit they were logged in. Be concise, specific, and reference dates or numbers directly from the data. If nothing matches, say so plainly rather than making something up.`;
+  const system = `You are a helpful workout tracking assistant. Today's date is ${today}. Always use the provided tools to look up the user's actual logged data before answering — never guess or estimate numbers. If a query implies a date range (e.g. "last week", "this month"), compute the actual dates yourself relative to today. Weights are already in the unit they were logged in. An exercise with structure "total" was reported as one aggregate (e.g. "100 push-ups") with no set breakdown — don't describe it as "1 set" or imply it was done unbroken; just state the total. Be concise, specific, and reference dates or numbers directly from the data. If nothing matches, say so plainly rather than making something up.`;
 
   for (let i = 0; i < 4; i++) {
     const response = await anthropic.messages.create({
