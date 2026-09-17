@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Mic, Square, Loader2, RotateCcw, Check } from "lucide-react";
@@ -8,28 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { WorkoutReviewForm } from "@/components/workout-review-form";
+import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
 import type { ParsedWorkout } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type Stage =
-  | "idle"
-  | "recording"
-  | "transcribing"
-  | "review-transcript"
-  | "parsing"
-  | "review-workout"
-  | "saving";
-
-const MIME_CANDIDATES = [
-  "audio/webm;codecs=opus",
-  "audio/webm",
-  "audio/mp4",
-];
-
-function pickMimeType(): string | undefined {
-  if (typeof MediaRecorder === "undefined") return undefined;
-  return MIME_CANDIDATES.find((t) => MediaRecorder.isTypeSupported(t));
-}
+type Stage = "idle" | "review-transcript" | "parsing" | "review-workout" | "saving";
 
 function formatElapsed(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -40,75 +23,16 @@ function formatElapsed(seconds: number): string {
 export function RecordFlow() {
   const router = useRouter();
   const [stage, setStage] = useState<Stage>("idle");
-  const [elapsed, setElapsed] = useState(0);
   const [transcript, setTranscript] = useState("");
   const [workout, setWorkout] = useState<ParsedWorkout | null>(null);
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-    };
-  }, []);
-
-  const startRecording = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      chunksRef.current = [];
-
-      const mimeType = pickMimeType();
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      mediaRecorderRef.current = recorder;
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
-      recorder.onstop = async () => {
-        streamRef.current?.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-        const blob = new Blob(chunksRef.current, { type: mimeType ?? "audio/webm" });
-        await transcribe(blob);
-      };
-
-      recorder.start();
-      setElapsed(0);
-      setStage("recording");
-      timerRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
-    } catch {
-      toast.error("Couldn't access the microphone. Check your browser permissions.");
-    }
-  }, []);
-
-  const stopRecording = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    setStage("transcribing");
-    mediaRecorderRef.current?.stop();
-  }, []);
-
-  async function transcribe(blob: Blob) {
-    try {
-      const formData = new FormData();
-      formData.append("audio", blob, "recording.webm");
-      const res = await fetch("/api/transcribe", { method: "POST", body: formData });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setTranscript(data.transcript);
+  const recorder = useVoiceRecorder({
+    onTranscript: (text) => {
+      setTranscript(text);
       setStage("review-transcript");
-    } catch {
-      toast.error("Transcription failed. Want to try recording again?");
-      setStage("idle");
-    }
-  }
+    },
+    onError: (message) => toast.error(message),
+  });
 
   async function parseTranscript() {
     setStage("parsing");
@@ -154,44 +78,51 @@ export function RecordFlow() {
 
   function reset() {
     setStage("idle");
-    setElapsed(0);
     setTranscript("");
     setWorkout(null);
   }
 
   return (
     <div className="flex flex-col gap-6 px-4 pt-8">
-      {(stage === "idle" || stage === "recording" || stage === "transcribing") && (
-        <div className="flex flex-col items-center gap-4 pt-12">
+      {stage === "idle" && (
+        <div className="flex flex-col items-center gap-5 pt-12">
           <button
             type="button"
-            onClick={stage === "recording" ? stopRecording : stage === "idle" ? startRecording : undefined}
-            disabled={stage === "transcribing"}
+            onClick={
+              recorder.status === "recording"
+                ? recorder.stop
+                : recorder.status === "idle"
+                  ? recorder.start
+                  : undefined
+            }
+            disabled={recorder.status === "transcribing"}
             className={cn(
-              "flex size-32 items-center justify-center rounded-full shadow-lg transition-all active:scale-95",
-              stage === "recording"
-                ? "bg-red-500 text-white animate-pulse"
-                : "bg-primary text-primary-foreground hover:bg-primary/90",
-              stage === "transcribing" && "opacity-60",
+              "flex size-32 items-center justify-center rounded-full transition-all active:scale-95",
+              recorder.status === "recording"
+                ? "bg-red-500 text-white shadow-lg shadow-red-500/30 animate-pulse"
+                : "bg-primary text-primary-foreground shadow-lg shadow-primary/30 hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/40",
+              recorder.status === "transcribing" && "opacity-60",
             )}
-            aria-label={stage === "recording" ? "Stop recording" : "Start recording"}
+            aria-label={recorder.status === "recording" ? "Stop recording" : "Start recording"}
           >
-            {stage === "transcribing" ? (
+            {recorder.status === "transcribing" ? (
               <Loader2 className="size-12 animate-spin" />
-            ) : stage === "recording" ? (
+            ) : recorder.status === "recording" ? (
               <Square className="size-10" fill="currentColor" />
             ) : (
               <Mic className="size-12" />
             )}
           </button>
           <div className="text-center">
-            {stage === "recording" && (
-              <p className="text-2xl font-mono tabular-nums">{formatElapsed(elapsed)}</p>
+            {recorder.status === "recording" && (
+              <p className="text-2xl font-mono font-medium tabular-nums">
+                {formatElapsed(recorder.elapsedSeconds)}
+              </p>
             )}
             <p className="mt-1 text-sm text-muted-foreground">
-              {stage === "idle" && "Tap to start talking through your workout"}
-              {stage === "recording" && "Recording — tap the square to stop"}
-              {stage === "transcribing" && "Transcribing your recording…"}
+              {recorder.status === "idle" && "Tap to start talking through your workout"}
+              {recorder.status === "recording" && "Recording — tap the square to stop"}
+              {recorder.status === "transcribing" && "Transcribing your recording…"}
             </p>
           </div>
         </div>
@@ -200,7 +131,7 @@ export function RecordFlow() {
       {stage === "review-transcript" && (
         <div className="flex flex-col gap-4">
           <div>
-            <h2 className="text-lg font-semibold">Here&apos;s what I heard</h2>
+            <h2 className="text-lg font-semibold tracking-tight">Here&apos;s what I heard</h2>
             <p className="text-sm text-muted-foreground">Fix anything that got mis-transcribed, then continue.</p>
           </div>
           <Textarea
@@ -230,7 +161,7 @@ export function RecordFlow() {
       {stage === "review-workout" && workout && (
         <div className="flex flex-col gap-4 pb-4">
           <div>
-            <h2 className="text-lg font-semibold">Review your workout</h2>
+            <h2 className="text-lg font-semibold tracking-tight">Review your workout</h2>
             <p className="text-sm text-muted-foreground">Double-check the numbers before saving.</p>
           </div>
           <WorkoutReviewForm value={workout} onChange={setWorkout} />

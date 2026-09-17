@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Send } from "lucide-react";
+import { toast } from "sonner";
+import { Loader2, Send, Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
 import { cn } from "@/lib/utils";
 
 interface Message {
@@ -22,6 +24,11 @@ export function AskChat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const recorder = useVoiceRecorder({
+    onTranscript: (text) => setInput(text),
+    onError: (message) => toast.error(message),
+  });
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -69,11 +76,31 @@ export function AskChat() {
               ask(input);
             }
           }}
-          placeholder="Ask about your workouts…"
+          disabled={recorder.status !== "idle"}
+          placeholder={recorder.status === "recording" ? "Listening…" : "Ask about your workouts…"}
           rows={1}
           className="max-h-32 min-h-9 flex-1 resize-none"
         />
-        <Button type="submit" size="icon" disabled={loading || !input.trim()} aria-label="Ask">
+        <Button
+          type="button"
+          variant={recorder.status === "recording" ? "default" : "outline"}
+          size="icon"
+          onClick={recorder.status === "recording" ? recorder.stop : recorder.status === "idle" ? recorder.start : undefined}
+          disabled={recorder.status === "transcribing"}
+          className={cn(
+            recorder.status === "recording" && "border-red-500 bg-red-500 text-white hover:bg-red-500/90 animate-pulse",
+          )}
+          aria-label={recorder.status === "recording" ? "Stop recording" : "Ask by voice"}
+        >
+          {recorder.status === "transcribing" ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : recorder.status === "recording" ? (
+            <Square className="size-4" fill="currentColor" />
+          ) : (
+            <Mic className="size-4" />
+          )}
+        </Button>
+        <Button type="submit" size="icon" disabled={loading || recorder.status !== "idle" || !input.trim()} aria-label="Ask">
           <Send className="size-4" />
         </Button>
       </form>

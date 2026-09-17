@@ -15,20 +15,20 @@ export default async function HistoryPage() {
   if (workouts.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 px-4 pt-24 text-center">
-        <p className="text-lg font-medium">No workouts yet</p>
+        <p className="text-lg font-semibold tracking-tight">No workouts yet</p>
         <p className="text-sm text-muted-foreground">Record your first one from the Record tab.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3 px-4 pt-6 pb-4">
-      <h1 className="text-xl font-bold">History</h1>
+    <div className="flex flex-col gap-3 px-4 pt-8 pb-4">
+      <h1 className="text-2xl font-bold tracking-tight">History</h1>
       {workouts.map((w) => (
         <Link key={w.id} href={`/history/${w.id}`}>
-          <Card className="transition-colors hover:bg-muted/50">
+          <Card className="shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center justify-between text-sm font-medium">
+              <CardTitle className="flex items-center justify-between text-sm font-semibold">
                 <span>{formatDate(w.date)}</span>
                 <Badge variant="secondary">
                   {w.exercises.length} exercise{w.exercises.length === 1 ? "" : "s"}

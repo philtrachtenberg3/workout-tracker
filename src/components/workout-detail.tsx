@@ -56,9 +56,9 @@ export function WorkoutDetail({ id, rawTranscript, initialWorkout }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-4 px-4 pt-6 pb-4">
+    <div className="flex flex-col gap-4 px-4 pt-8 pb-4">
       <div className="flex items-center justify-between gap-2">
-        <h1 className="text-lg font-bold">{formatDate(workout.date)}</h1>
+        <h1 className="text-xl font-bold tracking-tight">{formatDate(workout.date)}</h1>
         <div className="flex gap-2">
           {editing ? (
             <>
